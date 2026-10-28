@@ -25,14 +25,22 @@ app = FastAPI(title="GlowMatch API")
 DEV_ORIGIN_REGEX = r"http://(localhost|127\.0\.0\.1)(:\d+)?"
 
 _configured = os.environ.get("ALLOWED_ORIGINS", "").strip()
-allowed_origins = [o.strip() for o in _configured.split(",") if o.strip()]
-dev_origin_regex = None if _configured else DEV_ORIGIN_REGEX
+# Browsers send Origin without a trailing slash, so "https://x.app/" would never
+# match. Strip it rather than fail silently.
+allowed_origins = [o.strip().rstrip("/") for o in _configured.split(",") if o.strip()]
 
-if not _configured:
+# Optional regex for origins that can't be listed up front, e.g. Vercel preview
+# deployments: https://tinted-[a-z0-9]+-stupnds-projects\.vercel\.app
+_configured_regex = os.environ.get("ALLOWED_ORIGIN_REGEX", "").strip()
+dev_origin_regex = _configured_regex or (None if _configured else DEV_ORIGIN_REGEX)
+
+if not _configured and not _configured_regex:
     print(
         "[cors] ALLOWED_ORIGINS is unset — allowing any localhost port (dev mode). "
         "Set it to your deployed origin before going public."
     )
+else:
+    print(f"[cors] allowing origins={allowed_origins} regex={_configured_regex or None}")
 
 # Order matters: middleware added last is outermost, so CORS wraps the body-size
 # check and a 413 still comes back with CORS headers the browser can read.

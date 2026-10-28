@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Fraunces } from "next/font/google";
 import { Navbar } from "@/components/layout/Navbar";
+import { WakeServer } from "@/components/layout/WakeServer";
 import "./globals.css";
 
 const inter = Inter({
@@ -41,6 +42,7 @@ export default function RootLayout({
         <a href="#main" className="sr-only-focusable">
           Skip to content
         </a>
+        <WakeServer />
         <Navbar />
         <main id="main" className="pt-16">
           {children}
