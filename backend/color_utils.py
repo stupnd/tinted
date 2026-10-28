@@ -6,9 +6,10 @@ than raw sensor values.
 
 Public API
 ----------
-preprocess_image(img_bytes)       -> np.ndarray  (decode + white balance)
-gray_world_whitebalance(img_bgr)  -> np.ndarray  (illuminant correction)
-apply_clahe(img_bgr)              -> np.ndarray  (contrast boost — detection only)
+preprocess_image(img_bytes)         -> np.ndarray  (decode + white balance)
+neutral_pixel_whitebalance(img_bgr) -> np.ndarray  (illuminant correction used by preprocess)
+gray_world_whitebalance(img_bgr)    -> np.ndarray  (whole-image illuminant correction)
+apply_clahe(img_bgr)                -> np.ndarray  (contrast boost — detection only)
 """
 
 from __future__ import annotations
@@ -47,6 +48,50 @@ def gray_world_whitebalance(img_bgr: np.ndarray) -> np.ndarray:
     return np.clip(img, 0, 255).astype(np.uint8)
 
 
+# Pixels count as a neutral reference when HSV saturation is below this (0-255)
+# and they are neither in deep shadow nor clipped.
+_NEUTRAL_S_MAX = 40
+_NEUTRAL_V_MIN = 30
+_NEUTRAL_V_MAX = 245
+# Below this fraction of neutral pixels there is nothing trustworthy to
+# balance against, so the image is left as shot.
+_NEUTRAL_MIN_FRAC = 0.05
+# A real illuminant cast rarely needs more than this per-channel correction;
+# larger gains mean the "neutral" pixels weren't neutral.
+_MAX_CHANNEL_GAIN = 1.25
+
+
+def neutral_pixel_whitebalance(img_bgr: np.ndarray) -> np.ndarray:
+    """Gray-world correction estimated only from near-neutral pixels.
+
+    Plain gray-world assumes the whole frame averages to grey. In a close-up
+    selfie the frame is mostly skin, so it treats the skin itself as the cast
+    and pulls it to grey (a medium-warm #ca8263 came out as #949295). Here the
+    illuminant is measured from low-saturation pixels only — walls, clothing,
+    the whites of the eyes — and skin never votes on its own correction.
+
+    When fewer than ``_NEUTRAL_MIN_FRAC`` of pixels are neutral the image is
+    returned unchanged: an uncorrected photo is a smaller error than a guessed
+    correction. Gains are clamped to ``_MAX_CHANNEL_GAIN`` either way.
+    """
+    hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    neutral = (
+        (hsv[:, :, 1] < _NEUTRAL_S_MAX)
+        & (hsv[:, :, 2] > _NEUTRAL_V_MIN)
+        & (hsv[:, :, 2] < _NEUTRAL_V_MAX)
+    )
+    if neutral.mean() < _NEUTRAL_MIN_FRAC:
+        return img_bgr
+
+    means = img_bgr[neutral].astype(np.float32).mean(axis=0)
+    gains = np.clip(
+        means.mean() / np.maximum(means, 1e-3),
+        1.0 / _MAX_CHANNEL_GAIN,
+        _MAX_CHANNEL_GAIN,
+    )
+    return np.clip(img_bgr.astype(np.float32) * gains, 0, 255).astype(np.uint8)
+
+
 def apply_clahe(img_bgr: np.ndarray) -> np.ndarray:
     """Apply CLAHE to the L* channel only, leaving hue and saturation intact.
 
@@ -67,7 +112,7 @@ def apply_clahe(img_bgr: np.ndarray) -> np.ndarray:
 
 
 def preprocess_image(img_bytes: bytes) -> np.ndarray:
-    """Decode *img_bytes* to a BGR ndarray and apply gray-world white balance.
+    """Decode *img_bytes* to a BGR ndarray and apply neutral-pixel white balance.
 
     CLAHE is deliberately NOT applied here: it redistributes luminance and
     would bias the skin-colour measurement (~1 MST level deeper).  Landmark
@@ -87,4 +132,4 @@ def preprocess_image(img_bytes: bytes) -> np.ndarray:
             "please upload a valid JPEG, PNG, or WebP file."
         )
 
-    return gray_world_whitebalance(img_bgr)
+    return neutral_pixel_whitebalance(img_bgr)

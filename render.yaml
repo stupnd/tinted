@@ -27,6 +27,10 @@ services:
       - key: ALLOWED_ORIGINS
         sync: false
 
+      # Optional regex for origins that can't be listed, e.g. Vercel previews.
+      - key: ALLOWED_ORIGIN_REGEX
+        sync: false
+
       # Hard ceiling on estimated Claude spend per UTC day. Paid endpoints
       # return 503 once crossed, resetting at midnight UTC. The per-IP rate
       # limit is forgeable via X-Forwarded-For, so this is the real backstop.

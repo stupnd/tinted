@@ -3,7 +3,12 @@
 import numpy as np
 import pytest
 
-from color_utils import apply_clahe, gray_world_whitebalance, preprocess_image
+from color_utils import (
+    apply_clahe,
+    gray_world_whitebalance,
+    neutral_pixel_whitebalance,
+    preprocess_image,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +95,33 @@ def test_clahe_does_not_shift_hue_on_uniform_image():
     hue_before = cv2.cvtColor(img,    cv2.COLOR_BGR2HSV)[:, :, 0]
     hue_after  = cv2.cvtColor(result, cv2.COLOR_BGR2HSV)[:, :, 0]
     np.testing.assert_array_equal(hue_before, hue_after)
+
+
+# neutral_pixel_whitebalance
+
+def test_neutral_wb_leaves_skin_dominated_image_alone():
+    # A frame that is all skin has no neutral reference; plain gray-world
+    # would drag it to grey.
+    img = np.full((100, 100, 3), (99, 130, 202), dtype=np.uint8)  # BGR, #ca8263
+    np.testing.assert_array_equal(neutral_pixel_whitebalance(img), img)
+
+
+def test_neutral_wb_corrects_cast_measured_on_neutral_background():
+    # Skin patch on a grey wall under slightly warm light: the wall reads (118,122,130).
+    img = np.full((100, 100, 3), (118, 122, 130), dtype=np.uint8)
+    img[30:70, 30:70] = (99, 130, 202)
+    result = neutral_pixel_whitebalance(img).astype(np.float32)
+    wall = result[0:10, 0:10].reshape(-1, 3).mean(axis=0)
+    assert wall.max() - wall.min() < 3
+    # Skin keeps its hue: still clearly red > green > blue.
+    b, g, r = result[50, 50]
+    assert r > g > b
+
+
+def test_neutral_wb_caps_correction_gain():
+    img = np.full((100, 100, 3), (60, 90, 95), dtype=np.uint8)  # low-sat, strong cast
+    result = neutral_pixel_whitebalance(img).astype(np.float32)
+    assert result[0, 0, 0] <= 60 * 1.25 + 1
 
 
 # ---------------------------------------------------------------------------

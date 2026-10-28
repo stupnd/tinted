@@ -111,6 +111,18 @@ function postJson<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
+// ── Wake ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Fire-and-forget ping so a sleeping Render free-tier instance (~30s cold
+ * start) is booting while the user is still choosing a photo, not after.
+ */
+export function wakeServer(): void {
+  fetch(`${API_URL}/health`).catch(() => {
+    // Best effort — real requests surface their own errors.
+  });
+}
+
 // ── Analyze ───────────────────────────────────────────────────────────────────
 
 export type MatchedShade = {
