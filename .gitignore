@@ -226,3 +226,6 @@ backend/.venv-py39-old/
 # Generated eval reports
 backend/eval/results_classifier.json
 backend/eval/audit.json
+
+# MST-E photos are licensed for evaluation only and must never be committed
+backend/eval/mste/

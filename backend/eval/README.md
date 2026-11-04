@@ -33,6 +33,31 @@ photograph — is the one that needs labelled faces, and it is unanswered.
 
 ---
 
+## Real photographs: MST-E
+
+`mste_eval.py` runs the production pipeline (white balance, landmarks,
+quality gate, patch sampling, classifier) on Google's
+[Monk Skin Tone Examples](https://skintone.google/mste-dataset): 1,515
+consented photos of 19 people, each with an expert MST label from Dr. Ellis
+Monk, across poses and lighting.
+
+Terms: research and model evaluation only, never training. The images stay
+out of the repo (`backend/eval/mste/` is gitignored); the report holds
+aggregates only, with subjects anonymised as S01..S19.
+
+1. Sign in with a Google account and download the images and the per-image
+   metadata CSV from the dataset page (anonymous download is not offered).
+2. Put them anywhere, e.g. `backend/eval/mste/`.
+3. Run:
+
+```bash
+python eval/mste_eval.py --root eval/mste --limit 50        # smoke test
+python eval/mste_eval.py --root eval/mste --out mste-report.json
+```
+
+19 people is the honest N, so the report gives per-person results and
+confidence intervals from a bootstrap that resamples people, not photos.
+
 ## Running what works now
 
 ```bash
